@@ -1,0 +1,6 @@
+venv/
+data/
+extracted_data/
+logs/
+SmartNeev_Google_Maps_Review_Scrapper.egg-info/
+.DS_Store
