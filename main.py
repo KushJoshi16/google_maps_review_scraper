@@ -9,16 +9,21 @@ import time
 import sys
 
 PROCESS_NUM = 5
+TIMEOUT = 10
+
 if (len(sys.argv))>1:
     PROCESS_NUM = int(sys.argv[1])
+if (len(sys.argv))>2:
+    TIMEOUT = int(sys.argv[2])
 
 if multiprocessing.current_process().name == "MainProcess":
     logging.info(f"{PROCESS_NUM} Scraping Processes running in parallel")
+    logging.info(f"Timeout -> {TIMEOUT}")
 
 def scrape(process_number: int):
     scrapper = Scrapper()
     scrapper.set_url("https://www.google.com/maps/")
-    scrapper.set_timeout(10)
+    scrapper.set_timeout(TIMEOUT)
     data = []
     data_path = os.path.join("data","Assignment.xlsx")
     excel_keywords = pd.read_excel(data_path)
