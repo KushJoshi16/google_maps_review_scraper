@@ -22,6 +22,13 @@ class Scrapper:
     def set_timeout(self,timeout=4):
         self.timeout = timeout
     
+    def busy_wait_till_page_load(self,delay = 2):
+        try:
+            while(self.driver.execute_script('return document.readyState;') != 'complete'):
+                time.sleep(delay)
+        except Exception as e:
+            logging.critical(e,exc_info=True)
+
     def get_maps_data(self,keywords:str):
         data = None
         if self.url==None:
@@ -100,6 +107,7 @@ class Scrapper:
 
         prev_count = -1
         count = 0
+        empty_review = 0
         # last_height = self.driver.execute_script("return arguments[0].scrollHeight",scrollable_page)
         while prev_count!=count:
             try:
@@ -125,24 +133,35 @@ class Scrapper:
                 #scroll line ----------------------------------------------------------------------------------------------------------------
                 self.driver.execute_script("arguments[0].scrollIntoView(true);", review_div)
                 # new_height = self.driver.execute_script("return arguments[0].scrollHeight",scrollable_page)
-
-                review_present = EC.presence_of_all_elements_located((By.XPATH,".//div/div/div[4]/div[2]/div/span[1]"))
-                WebDriverWait(review_div, timeout).until(review_present)
-                name_present = EC.presence_of_all_elements_located((By.XPATH,".//div/div/div[2]/div[2]/div[1]/button/div[1]"))
-                WebDriverWait(review_div, timeout).until(name_present)
-
-                review_element = review_div.find_element(By.XPATH,".//div/div/div[4]/div[2]/div/span[1]")
-                name_element = review_div.find_element(By.XPATH,".//div/div/div[2]/div[2]/div[1]/button/div[1]")
+                name_element = None
                 try:
-                    more_present = EC.presence_of_all_elements_located((By.XPATH,".//parent::div/span[2]/button"))
-                    WebDriverWait(review_div, 4).until(more_present)
-                    more_button = review_element.find_element(By.XPATH,".//parent::div/span[2]/button")
-                    more_button.click()
-                    time.sleep(1)
-                except Exception:
-                    pass
-                reviews.append((name_element.text, review_element.text))
+                    name_present = EC.presence_of_all_elements_located((By.XPATH,".//div/div/div[2]/div[2]/div[1]/button/div[1]"))
+                    WebDriverWait(review_div, timeout).until(name_present)
+
+                    name_element = review_div.find_element(By.XPATH,".//div/div/div[2]/div[2]/div[1]/button/div[1]")
+
+                    review_present = EC.presence_of_all_elements_located((By.XPATH,".//div/div/div[4]/div[2]/div/span[1]"))
+                    WebDriverWait(review_div, timeout).until(review_present)
+
+                    review_element = review_div.find_element(By.XPATH,".//div/div/div[4]/div[2]/div/span[1]")
+                    try:
+                        more_present = EC.presence_of_all_elements_located((By.XPATH,".//parent::div/span[2]/button"))
+                        WebDriverWait(review_div, 4).until(more_present)
+                        more_button = review_element.find_element(By.XPATH,".//parent::div/span[2]/button")
+                        more_button.click()
+                        time.sleep(1)
+                    except Exception:
+                        pass
+                    reviews.append((name_element.text, review_element.text))
+                except TimeoutException:
+                    # empty_review += 1
+                    if name_element != None:
+                        logging.info(f"Review by {name_element.text} is empty")
+                        reviews.append((name_element.text,''))
+                    continue
+
                 count += 1
+
                 #scroll line ----------------------------------------------------------------------------------------------------------------
                 self.driver.execute_script("arguments[0].scrollBy(0,arguments[1].scrollHeight)",scrollable_page,review_div)
 

@@ -3,11 +3,19 @@ import pandas as pd
 from src.scrapper import Scrapper
 from src.logger import logging
 from datetime import datetime
-import threading
+# import threading
+import multiprocessing
+import time
+import sys
 
-THREAD_NUM = 5
+PROCESS_NUM = 5
+if (len(sys.argv))>1:
+    PROCESS_NUM = int(sys.argv[1])
 
-def scrape(thread_number: int):
+if multiprocessing.current_process().name == "MainProcess":
+    logging.info(f"{PROCESS_NUM} Scraping Processes running in parallel")
+
+def scrape(process_number: int):
     scrapper = Scrapper()
     scrapper.set_url("https://www.google.com/maps/")
     scrapper.set_timeout(10)
@@ -16,7 +24,7 @@ def scrape(thread_number: int):
     excel_keywords = pd.read_excel(data_path)
     df = pd.DataFrame(excel_keywords)
 
-    file_name = "reviews_"+datetime.now().strftime('%m_%d_%Y_%H_')+thread_number.__str__()+".csv"
+    file_name = "reviews_"+datetime.now().strftime('%m_%d_%Y_%H_')+process_number.__str__()+".csv"
     dir_path = os.path.join(os.getcwd(),"extracted_data")
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
@@ -30,12 +38,12 @@ def scrape(thread_number: int):
                 writer = csv.writer(csv_file)
                 writer.writerow(['Property','Address','reviewer_name','review'])
                 csv_file.close()
-
+        scrapper.busy_wait_till_page_load(4)
         csv_file = open(file_path, 'w')
         if csv_file != None:
             writer = csv.writer(csv_file)
             for index,row in df.iterrows():
-                if index%THREAD_NUM == thread_number:
+                if index%PROCESS_NUM == process_number:
                     new_reviews = scrapper.get_maps_data(row[0])
                     for review in new_reviews:
                         writer.writerow([row[0],row[1],review[0],review[1]])
@@ -45,23 +53,17 @@ def scrape(thread_number: int):
 
     scrapper.close_scrapper()
 
-# def scrapem(num):
-#     for i in range(10):
-#         if i%THREAD_NUM == num:
-#             print(f'{i}\t{num}')
-
-
 if __name__ =="__main__":
-    thread_count = THREAD_NUM
-    threads = list()
-    for thread_num in range(thread_count):
-        threads.append(threading.Thread(target=scrape, args=(thread_num,)))
+    process_count = PROCESS_NUM
+    processes = list()
+    for process_num in range(process_count):
+        processes.append(multiprocessing.Process(target=scrape, args=(process_num,)))
 
 
-    for t in threads:
-        t.start()
+    for prcs in processes:
+        prcs.start()
 
-    for t in threads:
-        t.join()
+    for prcs in processes:
+        prcs.join()
 
     
