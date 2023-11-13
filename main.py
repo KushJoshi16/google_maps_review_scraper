@@ -2,7 +2,9 @@ import os, csv
 import pandas as pd
 from src.scrapper import Scrapper
 from src.logger import logging
+from src.exception import CustomException
 from datetime import datetime
+
 # import threading
 import multiprocessing
 import time
@@ -18,7 +20,7 @@ if (len(sys.argv))>2:
 
 if multiprocessing.current_process().name == "MainProcess":
     logging.info(f"{PROCESS_NUM} Scraping Processes running in parallel")
-    logging.info(f"Timeout -> {TIMEOUT}")
+    logging.info(f"TIMEOUT set to -> {TIMEOUT} secs")
 
 def scrape(process_number: int):
     scrapper = Scrapper()
@@ -30,7 +32,8 @@ def scrape(process_number: int):
     df = pd.DataFrame(excel_keywords)
 
     file_name = "reviews_"+datetime.now().strftime('%m_%d_%Y_%H_')+process_number.__str__()+".csv"
-    dir_path = os.path.join(os.getcwd(),"extracted_data")
+    file_dir_name = datetime.now().strftime('%m_%d_%Y_%H')
+    dir_path = os.path.join(os.getcwd(),"extracted_data",file_dir_name)
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
     file_path = os.path.join(dir_path,file_name)
@@ -43,7 +46,7 @@ def scrape(process_number: int):
                 writer = csv.writer(csv_file)
                 writer.writerow(['Property','Address','reviewer_name','review'])
                 csv_file.close()
-        scrapper.busy_wait_till_page_load(4)
+        # scrapper.busy_wait_till_page_load(4)
         csv_file = open(file_path, 'w')
         if csv_file != None:
             writer = csv.writer(csv_file)
@@ -54,7 +57,8 @@ def scrape(process_number: int):
                         writer.writerow([row[0],row[1],review[0],review[1]])
             csv_file.close()
     except Exception as e:
-        logging.critical(e,exc_info=True)
+        logging.info("Exception in scrape function in main.py")
+        raise CustomException(e,sys)
 
     scrapper.close_scrapper()
 
@@ -70,5 +74,6 @@ if __name__ =="__main__":
 
     for prcs in processes:
         prcs.join()
+    print("done")
 
     
