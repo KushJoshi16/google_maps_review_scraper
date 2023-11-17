@@ -48,8 +48,10 @@ class Scrapper:
             WebDriverWait(self.driver, self.timeout).until(element_present)
         except TimeoutException:
             logging.info("Timed out waiting for maps web page to load")
+            return data
         except Exception as e:
             logging.error(error_message_details(e,sys))
+            return data
 
         # searchboxinput - id
         # searchboxinput xiQnY - class
@@ -93,17 +95,22 @@ class Scrapper:
 
             except TimeoutException:
                 logging.info("Timed out waiting for Scrollable div to load")
+                return reviews, scrollable_page
             except Exception as e:
                 logging.error(error_message_details(e,sys))
+                return reviews, scrollable_page
         except TimeoutException:
             logging.info("Timed out waiting for review button to load")
             try:
                 reviews.extend(self.__select_property_from_scroll_div())
-                self.__collect_property_list_from_scroll_div_and_get_reviws()
+                # print(self.__collect_property_list_from_scroll_div_and_get_reviews())
+                return reviews, scrollable_page
             except Exception:
                 logging.info("No reviews extracted")
+                return reviews, scrollable_page
         except Exception as e:
             logging.error(error_message_details(e,sys))
+            return reviews, scrollable_page
         
         return reviews, scrollable_page
     
@@ -191,8 +198,8 @@ class Scrapper:
         logging.info(f"{count} reviews extracted.")
 
         return reviews
-        
-    def __collect_property_list_from_scroll_div_and_get_reviws(self,timeout = 3):
+  
+    def __collect_property_list_from_scroll_div_and_get_reviews(self,start_div_num=1,timeout = 3):
         logging.info("Attempting to get detect property list and get reviews.")
         properties_list = list()
         prev_prop_count = -1
@@ -201,67 +208,104 @@ class Scrapper:
         properties_list_div_present = EC.presence_of_all_elements_located((By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[2]/div/div[1]/div/div/div[1]/div[1]'))
         WebDriverWait(self.driver, timeout).until(properties_list_div_present)
         properties_list_div = self.driver.find_element(By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[2]/div/div[1]/div/div/div[1]/div[1]')
-
-        while prev_prop_count != property_count:
+        property_flag = 0
+        while prev_prop_count != property_count or property_flag < 3 :
             prev_prop_count = property_count
             try:
                 count = property_count
-                property_div_present = EC.presence_of_element_located((By.XPATH,f".//div[{count*2 + 1}]/div/a"))
+                property_flag += 1
+                property_div_present = EC.presence_of_element_located((By.XPATH,f".//div[{count*2 + start_div_num}]/div/a"))
                 WebDriverWait(properties_list_div, timeout).until(property_div_present)
                 property_div = properties_list_div.find_element(By.XPATH,f".//div[{count*2 + 1}]/div/a")
-                property_div.append(properties_list_div.get_attribute('href'))
+                self.driver.execute_script("arguments[0].scrollIntoView(true);", property_div)
+                prop_link = property_div.get_attribute('href')
+                properties_list.append(prop_link)
                 property_count += 1
+                self.driver.execute_script("arguments[0].scrollBy(0,arguments[1].scrollHeight)",properties_list_div,property_div.parent)
             except TimeoutException:
-                logging.info("Unable to find more properties in the list.")
-                logging.info(properties_list)
+                if property_flag >=2 :
+                    logging.info("Unable to find more properties in the list.")
+                logging.info(f"property list :\t{properties_list}")
+                return properties_list
             except Exception as e:
                 logging.error(error_message_details(e,sys))
-            for property in properties_list:
-                # open property link and get reviews
-                pass
+                return properties_list
+            # for property in properties_list:
+            #     # open property link and get reviews
+            #     pass
+
+        return properties_list
+
             
 
         
     def __select_property_from_scroll_div(self,timeout = 3):
         logging.info("Attempting to get detect property list and get reviews.")
         reviews = list()
-        prev_count = -1
-        count = 0
+        property_list = []
+        try:
+            property_list.extend(self.__collect_property_list_from_scroll_div_and_get_reviews())
+        except Exception:
+            pass
+        try:
+            property_list.extend(self.__collect_property_list_from_scroll_div_and_get_reviews(0))
+        except Exception:
+            pass
 
-        properties_list_div_present = EC.presence_of_all_elements_located((By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[2]/div/div[1]/div/div/div[1]/div[1]'))
-        WebDriverWait(self.driver, timeout).until(properties_list_div_present)
-        properties_list_div = self.driver.find_element(By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[2]/div/div[1]/div/div/div[1]/div[1]')
-
-        while prev_count != count:
-            prev_count = count
+        for property in property_list:
             try:
-                property_div_present = EC.presence_of_element_located((By.XPATH,f".//div[{count*2 + 1}]/div/a"))
-                WebDriverWait(properties_list_div, timeout).until(property_div_present)
-                property_div = properties_list_div.find_element(By.XPATH,f".//div[{count*2 + 1}]/div/a")
-
-                property_div.click()
-
-                preperty_details_div_present = EC.presence_of_all_elements_located((By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[3]/div/div[1]/div/div/div[2]'))
-                WebDriverWait(self.driver, timeout).until(preperty_details_div_present)
-                preperty_details_div = self.driver.find_element(By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[3]/div/div[1]/div/div/div[2]')
-
-                review_page_button_present = EC.presence_of_all_elements_located((By.XPATH,".//div[3]/div/div/button[contains(.,'Reviews')]"))
-                WebDriverWait(preperty_details_div, timeout).until(review_page_button_present)
-                review_page_button = preperty_details_div.find_element(By.XPATH,".//div[3]/div/div/button[contains(.,'Reviews')]")
-                review_page_button.click()
-
-                scrollable_review_page_present = EC.presence_of_all_elements_located((By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[3]/div/div[1]/div/div/div[3]'))
-                WebDriverWait(preperty_details_div, timeout).until(scrollable_review_page_present)
-                scrollable_review_page = preperty_details_div.find_element(By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[3]/div/div[1]/div/div/div[3]')
-                reviews.extend(self.__extract_reviews_from_scroll_div(scrollable_review_page,timeout+4))
-                count+=1
-
-            except TimeoutException:
-                logging.info("Unable to find more properties in the list.")
+                self.driver.execute_script(f'''window.open("{property}","_blank");''')
+                self.driver.switch_to.window(self.driver.window_handles[1])
+                # scrape reviews from page
+                # scrollable_review_page_present = EC.presence_of_all_elements_located((By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[3]/div/div[1]/div/div/div[3]'))
+                # WebDriverWait(self.driver, timeout).until(scrollable_review_page_present)
+                # scrollable_review_page = self.driver.find_element(By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[3]/div/div[1]/div/div/div[3]')
+                # reviews.extend(self.__extract_reviews_from_scroll_div(scrollable_review_page,timeout+4))
+                self.__get_reviews(timeout+3)
+                #..........................
+                self.driver.close()
+                self.driver.switch_to.window(self.driver.window_handles[0])
             except Exception as e:
+                self.driver.switch_to.window(self.driver.window_handles[0])
                 logging.error(error_message_details(e,sys))
-        
+
         return reviews
+        # prev_count = -1
+        # count = 0
+
+        # properties_list_div_present = EC.presence_of_all_elements_located((By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[2]/div/div[1]/div/div/div[1]/div[1]'))
+        # WebDriverWait(self.driver, timeout).until(properties_list_div_present)
+        # properties_list_div = self.driver.find_element(By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[2]/div/div[1]/div/div/div[1]/div[1]')
+
+        # while prev_count != count:
+        #     prev_count = count
+        #     try:
+        #         property_div_present = EC.presence_of_element_located((By.XPATH,f".//div[{count*2 + 1}]/div/a"))
+        #         WebDriverWait(properties_list_div, timeout).until(property_div_present)
+        #         property_div = properties_list_div.find_element(By.XPATH,f".//div[{count*2 + 1}]/div/a")
+
+        #         property_div.click()
+
+        #         preperty_details_div_present = EC.presence_of_all_elements_located((By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[3]/div/div[1]/div/div/div[2]'))
+        #         WebDriverWait(self.driver, timeout).until(preperty_details_div_present)
+        #         preperty_details_div = self.driver.find_element(By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[3]/div/div[1]/div/div/div[2]')
+
+        #         review_page_button_present = EC.presence_of_all_elements_located((By.XPATH,".//div[3]/div/div/button[contains(.,'Reviews')]"))
+        #         WebDriverWait(preperty_details_div, timeout).until(review_page_button_present)
+        #         review_page_button = preperty_details_div.find_element(By.XPATH,".//div[3]/div/div/button[contains(.,'Reviews')]")
+        #         review_page_button.click()
+
+                # scrollable_review_page_present = EC.presence_of_all_elements_located((By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[3]/div/div[1]/div/div/div[3]'))
+                # WebDriverWait(preperty_details_div, timeout).until(scrollable_review_page_present)
+                # scrollable_review_page = preperty_details_div.find_element(By.XPATH,'/html/body/div[3]/div[8]/div[9]/div/div/div[1]/div[3]/div/div[1]/div/div/div[3]')
+                # reviews.extend(self.__extract_reviews_from_scroll_div(scrollable_review_page,timeout+4))
+        #         count+=1
+
+        #     except TimeoutException:
+        #         logging.info("Unable to find more properties in the list.")
+        #     except Exception as e:
+        #         logging.error(error_message_details(e,sys))
+        
 
 
 if __name__ == "__main__":
